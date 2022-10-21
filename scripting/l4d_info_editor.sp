@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.13"
+#define PLUGIN_VERSION		"1.14"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,10 @@
 
 ========================================================================================
 	Change Log:
+
+1.14 (21-Oct-2022)
+	- Fixed plugins not loading with the updated include file.
+	- Include file updated.
 
 1.13 (20-Oct-2022)
 	- L4D2: Plugin now prevents setting over 16 melee weapons. Thanks to "gabuch2" for reporting.

@@ -25,7 +25,7 @@
 
 public SharedPlugin __pl_info_editor_ = 
 {
-	name = "l4d_info_editor",
+	name = "info_editor",
 	file = "l4d_info_editor.smx",
 #if defined REQUIRE_PLUGIN
 	required = 1,
@@ -33,6 +33,15 @@ public SharedPlugin __pl_info_editor_ =
 	required = 0,
 #endif
 };
+
+#if !defined REQUIRE_PLUGIN
+public void __pl_info_editor__SetNTVOptional()
+{
+	MarkNativeAsOptional("InfoEditor_GetString");
+	MarkNativeAsOptional("InfoEditor_SetString");
+	MarkNativeAsOptional("InfoEditor_ReloadData");
+}
+#endif
 
 
 
