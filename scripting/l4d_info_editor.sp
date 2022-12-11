@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.15"
+#define PLUGIN_VERSION		"1.16"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.16 (11-Dec-2022)
+	- Fixed error in command "sm_info_melee" causing it to not display everything correctly.
 
 1.15 (11-Dec-2022)
 	- L4D2: Now supports 3rd party melee weapons where the mission.txt file does not contain a "meleeweapons" key. Thanks to "Yabi" for reporting and testing.
@@ -501,7 +504,7 @@ Action CmdInfoMelee(int client, int args)
 
 			if( strcmp(sTemp, sTabs) )
 			{
-				ReplyToCommand(client, "Melee mismatch: %d Mission [%s != StringTable [%s]", sTemp, sTabs);
+				ReplyToCommand(client, "Melee mismatch: %d Mission [%s != StringTable [%s]", i, sTemp, sTabs);
 			}
 		}
 	}
