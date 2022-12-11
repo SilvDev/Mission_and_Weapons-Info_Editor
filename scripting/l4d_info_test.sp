@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.2"
+#define PLUGIN_VERSION		"1.3"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.3 (11-Dec-2022)
+	- Increased string size.
 
 1.2 (20-Oct-2022)
 	- Small changes for a better example.
@@ -94,7 +97,7 @@ public void OnGetMissionInfo(int pThis)
 void OnMission(int pThis)
 {
 	// Example
-	char temp[64];
+	static char temp[256];
 
 	if( g_bLeft4Dead2 )
 	{

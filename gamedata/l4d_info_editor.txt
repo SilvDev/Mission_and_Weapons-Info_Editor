@@ -19,6 +19,21 @@
 				}
 			}
 
+			"CMeleeWeaponInfoStore::LoadScriptsFromManifest"
+			{
+				"signature"		"CMeleeWeaponInfoStore::LoadScriptsFromManifest"
+				"callconv"		"thiscall"
+				"return"		"int"
+				"this"			"ignore"
+				"arguments"
+				{
+					"a1"
+					{
+						"type"	"int"
+					}
+				}
+			}
+
 			"CTerrorGameRules::GetMissionInfo"
 			{
 				"signature"		"CTerrorGameRules::GetMissionInfo"
@@ -134,6 +149,15 @@
 				"windows"		"\x55\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\xFF\x2A\x84"
 				/* 55 8B ? 8B ? ? ? ? ? 8B ? 8B ? ? ? ? ? FF ? 84 */
 				/* Updated by Silvers. Search "scripts/melee/%s.txt". Call above. */
+			}
+
+			"CMeleeWeaponInfoStore::LoadScriptsFromManifest"
+			{
+				"library"		"server"
+				"linux"			"@_ZN21CMeleeWeaponInfoStore23LoadScriptsFromManifestEP14CUtlStringList"
+				"windows"		"\x55\x8B\x2A\x81\x2A\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x89\x2A\x2A\x8B\x2A\x2A\x6A\x2A\x89"
+				/* 55 8B ? 81 ? ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 8B ? ? 6A ? 89 */ // Found by SilverShot
+				/* Search "scripts/melee/melee_manifest.txt" */
 			}
 
 			"CTerrorGameRules::GetMissionInfo" // Found by V10
