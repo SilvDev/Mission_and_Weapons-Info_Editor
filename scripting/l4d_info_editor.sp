@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.16"
+#define PLUGIN_VERSION		"1.17"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.17 (12-Dec-2022)
+	- Forgot to turn off debug printing values.
 
 1.16 (11-Dec-2022)
 	- Fixed error in command "sm_info_melee" causing it to not display everything correctly.
@@ -131,7 +134,7 @@
 #define CONFIG_WEAPONS			"data/l4d_info_editor_weapons.cfg"
 #define MAX_STRING_LENGTH		4096
 #define MAX_STRING_MELEE		64 // Maximum string length of melee weapons
-#define DEBUG_VALUES			1
+#define DEBUG_VALUES			0
 #define FORCE_VALUES			1 // Force create keyvalues when not found.
 
 Handle g_hForwardOnGetMission;
