@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.17"
+#define PLUGIN_VERSION		"1.18"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,10 @@
 
 ========================================================================================
 	Change Log:
+
+1.18 (15-Dec-2022)
+	- Fixed duplicating custom melee weapons in the mission keyvalue string. Thanks to "ProjectSky" for reporting.
+	- Fixed not loading melee weapons if the "Info Editor" config is missing a "meleeweapons" key to use.
 
 1.17 (12-Dec-2022)
 	- Forgot to turn off debug printing values.
@@ -150,6 +154,7 @@ int g_PointerMission;
 bool g_bLeft4Dead2;
 bool g_bLoadNewMap;
 bool g_bManifest;
+bool g_bHasMelee;
 char g_sLastMap[PLATFORM_MAX_PATH];
 
 
@@ -184,6 +189,10 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("InfoEditor_ReloadData",		Native_ReloadData);
 
 	g_bManifest = late;
+	if( late )
+	{
+		LoadManifest();
+	}
 
 	return APLRes_Success;
 }
@@ -507,7 +516,7 @@ Action CmdInfoMelee(int client, int args)
 
 			if( strcmp(sTemp, sTabs) )
 			{
-				ReplyToCommand(client, "Melee mismatch: %d Mission [%s != StringTable [%s]", i, sTemp, sTabs);
+				ReplyToCommand(client, "Melee mismatch: %d Mission [%s] != StringTable [%s]", i, sTemp, sTabs);
 			}
 		}
 	}
@@ -687,6 +696,8 @@ void SetMissionData()
 	static char defs[MAX_STRING_LENGTH];
 	static char temp[MAX_STRING_MELEE];
 
+	// Loop through Info Editor config
+	int last;
 	int pos;
 	check[0] = 0;
 
@@ -700,6 +711,8 @@ void SetMissionData()
 		// Dynamic Melee Weapons:
 		if( g_bLeft4Dead2 && strcmp(key, "meleeweapons") == 0 )
 		{
+			g_bHasMelee = true;
+
 			// Add manifest entries for custom melee weapons when the mission file does not supply the "meleeweapons" string
 			// Ignore these default melee weapons
 			if( g_alMeleeCustoms )
@@ -746,7 +759,6 @@ void SetMissionData()
 				}
 			}
 
-
 			// "meleeweapons" string is not empty
 			if( strcmp(defs, "N/A") )
 			{
@@ -767,21 +779,20 @@ void SetMissionData()
 				ReplaceStringEx(check, sizeof(check), ";shovel;", ";");
 				ReplaceStringEx(check, sizeof(check), ";riot_shield;", ";");
 
-				// Allow maps unique melee weapons, then default
-				pos = strlen(check);
-				if( pos > 0 )
+				// Prevent duplicate entries
+				pos = 1;
+				while( (last = SplitString(check[pos], ";", temp, sizeof(temp))) != -1 )
 				{
-					if( pos == 1 && check[0] == ';' ) check[0] = 0;
-					Format(value, sizeof(value), "%s%s", check[1], value);
-				}
-				else
-				{
-					strcopy(value, sizeof(value), defs);
+					if( StrContains(value, temp) == -1 )
+					{
+						Format(value, sizeof(value), "%s;%s", value, temp);
+					}
+
+					pos += last;
 				}
 
 				// Prevent setting over 16 melee weapons
 				pos = 0;
-				int last;
 				for( int x = 0; x < 16; x++ )
 				{
 					last = FindCharInString(value[pos], ';');
@@ -796,6 +807,7 @@ void SetMissionData()
 					}
 				}
 
+				// Remove trailing ;
 				pos = strlen(value);
 				if( pos > 0 )
 				{
@@ -849,8 +861,13 @@ MRESReturn LoadScriptsFromManifest(DHookReturn hReturn, DHookParam hParams)
 {
 	g_bManifest = true;
 
-	hReturn.Value = 0;
-	return MRES_Supercede;
+	if( g_bHasMelee )
+	{
+		hReturn.Value = 0;
+		return MRES_Supercede;
+	}
+
+	return MRES_Ignored;
 }
 
 MRESReturn GetMeleeWeaponInfo(DHookReturn hReturn, DHookParam hParams)
@@ -962,35 +979,10 @@ void ResetPlugin()
 	{
 		g_bLoadNewMap = false;
 		g_bManifest = false;
+		g_bHasMelee = false;
 
 		// Load custom melee weapons list
-		if( g_bLeft4Dead2 )
-		{
-			delete g_alMeleeCustoms;
-			g_alMeleeCustoms = new ArrayList(ByteCountToCells(MAX_STRING_MELEE));
-
-			File hFile = OpenFile("scripts/melee/melee_manifest.txt", "r", true);
-			if( hFile )
-			{
-				char sLine[256];
-				int start;
-				int last;
-
-				while( !IsEndOfFile(hFile) && ReadFileLine(hFile, sLine, sizeof(sLine)) )
-				{
-					start = StrContains(sLine, "scripts/melee/", false);
-					if( start != -1 )
-					{
-						last = StrContains(sLine[start + 14], ".txt", false);
-						sLine[start + 14 + last] = 0;
-						g_alMeleeCustoms.PushString(sLine[start + 14]);
-						PrintToServer("READ FROM FILE [%s]", sLine[start + 14]);
-					}
-				}
-
-				delete hFile;
-			}
-		}
+		LoadManifest();
 	}
 
 	// Clear strings
@@ -1024,6 +1016,36 @@ void OnStart()
 {
 	// Reparse weapon and melee configs each map
 	ServerCommand("weapon_reparse_server; %s", g_bLeft4Dead2 ? "melee_reload_info_server" : "");
+}
+
+void LoadManifest()
+{
+	if( g_bLeft4Dead2 )
+	{
+		delete g_alMeleeCustoms;
+		g_alMeleeCustoms = new ArrayList(ByteCountToCells(MAX_STRING_MELEE));
+
+		File hFile = OpenFile("scripts/melee/melee_manifest.txt", "r", true);
+		if( hFile )
+		{
+			char sLine[256];
+			int start;
+			int last;
+
+			while( !IsEndOfFile(hFile) && ReadFileLine(hFile, sLine, sizeof(sLine)) )
+			{
+				start = StrContains(sLine, "scripts/melee/", false);
+				if( start != -1 )
+				{
+					last = StrContains(sLine[start + 14], ".txt", false);
+					sLine[start + 14 + last] = 0;
+					g_alMeleeCustoms.PushString(sLine[start + 14]);
+				}
+			}
+
+			delete hFile;
+		}
+	}
 }
 
 void LoadConfig()
