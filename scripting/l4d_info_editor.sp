@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.18"
+#define PLUGIN_VERSION		"1.19"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,12 @@
 
 ========================================================================================
 	Change Log:
+
+1.19 (16-Dec-2022)
+	- Fixed not loading melee weapons on certain maps under certain conditions. Thanks to "Mi.Cura" for reporting.
+	- Feature added: plugin can load mode specific sections that overwrite previous data loaded from the "l4d_info_editor_mission.cfg" config. Requested by "ProjectSky".
+	- Feature added: plugin can load mode specific configs, e.g. "l4d_info_editor_mission.versus.cfg" or "l4d_info_editor_mission.mutation3.cfg" for "Versus" or "Bleedout" modes etc.
+	- These features also apply to the "l4d_info_editor_weapons.cfg" data config.
 
 1.18 (15-Dec-2022)
 	- Fixed duplicating custom melee weapons in the mission keyvalue string. Thanks to "ProjectSky" for reporting.
@@ -141,6 +147,11 @@
 #define DEBUG_VALUES			0
 #define FORCE_VALUES			1 // Force create keyvalues when not found.
 
+bool g_bGameMode;
+ConVar g_hCvarMPGameMode;
+char g_sGameMode[64];
+char g_sConfigMission[PLATFORM_MAX_PATH];
+char g_sConfigWeapons[PLATFORM_MAX_PATH];
 Handle g_hForwardOnGetMission;
 Handle g_hForwardOnGetWeapons;
 Handle SDK_KV_GetString;
@@ -155,7 +166,6 @@ bool g_bLeft4Dead2;
 bool g_bLoadNewMap;
 bool g_bManifest;
 bool g_bHasMelee;
-char g_sLastMap[PLATFORM_MAX_PATH];
 
 
 
@@ -270,6 +280,10 @@ public void OnPluginStart()
 {
 	CreateConVar("l4d_info_editor_version", PLUGIN_VERSION, "Mission and Weapons - Info Editor plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
+	g_hCvarMPGameMode = FindConVar("mp_gamemode");
+	g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Cvars);
+	ConVarChanged_Cvars(null, "", "");
+
 	// ====================================================================================================
 	// SDKCalls
 	// ====================================================================================================
@@ -381,8 +395,8 @@ public void OnPluginStart()
 	ResetPlugin();
 
 	// Commands
-	RegAdminCmd("sm_info_weapons_list",	CmdInfoWeaponsList,	ADMFLAG_ROOT, "Show weapons config tree of modified data for this map.");
 	RegAdminCmd("sm_info_mission_list",	CmdInfoMissionList,	ADMFLAG_ROOT, "Show mission config tree of modified data for this map.");
+	RegAdminCmd("sm_info_weapons_list",	CmdInfoWeaponsList,	ADMFLAG_ROOT, "Show weapons config tree of modified data for this map.");
 	RegAdminCmd("sm_info_mission",		CmdInfoMission,		ADMFLAG_ROOT, "Get or set the value of a mission keyname. Usage: sm_info_mission <keyname> [value].");
 	RegAdminCmd("sm_info_reload",		CmdInfoReload,		ADMFLAG_ROOT, "Reloads the mission and weapons configs. Weapons info data is re-parsed allowing changes to be made live without changing level.");
 
@@ -420,8 +434,12 @@ Action CmdListenBlock(int client, const char[] command, int argc)
 
 public void OnMapEnd()
 {
-	GetCurrentMap(g_sLastMap, sizeof(g_sLastMap));
 	g_bLoadNewMap = true;
+}
+
+void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newValue)
+{
+	g_hCvarMPGameMode.GetString(g_sGameMode, sizeof(g_sGameMode));
 }
 
 
@@ -530,7 +548,6 @@ Action CmdInfoMelee(int client, int args)
 
 Action CmdInfoReload(int client, int args)
 {
-	g_sLastMap[0] = 0;
 	ReloadData();
 	ReplyToCommand(client, "[Info Editor] Reloaded configs and weapon attributes.");
 	return Plugin_Handled;
@@ -607,14 +624,18 @@ Action CmdInfoMission(int client, int args)
 
 Action CmdInfoMissionList(int client, int args)
 {
-	char key[MAX_STRING_LENGTH];
-	char value[MAX_STRING_LENGTH];
-
 	ReplyToCommand(client, "=============================");
 	ReplyToCommand(client, "===== MISSION INFO DATA =====");
 	ReplyToCommand(client, "=============================");
+	ReplyToCommand(client, " ");
+	ReplyToCommand(client, "Config: %s", g_sConfigMission);
+	ReplyToCommand(client, " ");
 
-	for( int i = 0; i < g_alMissionData.Length; i += 2 )
+	char key[MAX_STRING_LENGTH];
+	char value[MAX_STRING_LENGTH];
+	int length = g_alMissionData.Length;
+
+	for( int i = 0; i < length; i += 2 )
 	{
 		g_alMissionData.GetString(i, key, sizeof(key));
 		g_alMissionData.GetString(i + 1, value, sizeof(value));
@@ -628,17 +649,21 @@ Action CmdInfoMissionList(int client, int args)
 
 Action CmdInfoWeaponsList(int client, int args)
 {
+	ReplyToCommand(client, "=============================");
+	ReplyToCommand(client, "===== WEAPONS INFO DATA =====");
+	ReplyToCommand(client, "=============================");
+	ReplyToCommand(client, " ");
+	ReplyToCommand(client, "Config: %s", g_sConfigWeapons);
+	ReplyToCommand(client, " ");
+
 	ArrayList aHand;
 	int size;
+	int length = g_alWeaponsData.Length;
 	char key[MAX_STRING_LENGTH];
 	char value[MAX_STRING_LENGTH];
 	char check[MAX_STRING_LENGTH];
 
-	ReplyToCommand(client, "=============================");
-	ReplyToCommand(client, "===== WEAPONS INFO DATA =====");
-	ReplyToCommand(client, "=============================");
-
-	for( int x = 0; x < g_alWeaponsData.Length; x++ )
+	for( int x = 0; x < length; x++ )
 	{
 		// Weapon classname
 		aHand = g_alWeaponsData.Get(x);
@@ -692,13 +717,16 @@ void SetMissionData()
 	// Mission Info has no command, but we can manually set changes with ease.
 	static char key[MAX_STRING_LENGTH];
 	static char value[MAX_STRING_LENGTH];
+	static char extra[MAX_STRING_LENGTH];
 	static char check[MAX_STRING_LENGTH];
 	static char defs[MAX_STRING_LENGTH];
 	static char temp[MAX_STRING_MELEE];
 
 	// Loop through Info Editor config
+	bool write;
 	int last;
 	int pos;
+	extra[0] = 0;
 	check[0] = 0;
 
 	for( int i = 0; i < g_alMissionData.Length; i += 2 )
@@ -712,6 +740,7 @@ void SetMissionData()
 		if( g_bLeft4Dead2 && strcmp(key, "meleeweapons") == 0 )
 		{
 			g_bHasMelee = true;
+			write = false;
 
 			// Add manifest entries for custom melee weapons when the mission file does not supply the "meleeweapons" string
 			// Ignore these default melee weapons
@@ -745,6 +774,7 @@ void SetMissionData()
 					// If the maps "meleeweapons" string is empty, set them from the manifest
 					if( strcmp(defs, "N/A") == 0  )
 					{
+						write = true;
 						strcopy(defs, sizeof(defs), check);
 					}
 				}
@@ -754,6 +784,7 @@ void SetMissionData()
 					// If the maps "meleeweapons" string is empty, set them from the data config
 					if( strcmp(defs, "N/A") == 0  )
 					{
+						write = true;
 						strcopy(defs, sizeof(defs), value);
 					}
 				}
@@ -783,12 +814,17 @@ void SetMissionData()
 				pos = 1;
 				while( (last = SplitString(check[pos], ";", temp, sizeof(temp))) != -1 )
 				{
-					if( StrContains(value, temp) == -1 )
+					if( StrContains(value, temp) == -1 && StrContains(extra, temp) == -1 )
 					{
-						Format(value, sizeof(value), "%s;%s", value, temp);
+						Format(extra, sizeof(extra), "%s;%s", extra, temp);
 					}
 
 					pos += last;
+				}
+				
+				if( extra[0] )
+				{
+					Format(value, sizeof(value), "%s;%s", extra[1], value);
 				}
 
 				// Prevent setting over 16 melee weapons
@@ -821,7 +857,7 @@ void SetMissionData()
 		}
 
 		// Overwrite different values
-		if( strcmp(defs, value) )
+		if( write || strcmp(defs, value) )
 		{
 			#if DEBUG_VALUES || FORCE_VALUES
 			if( strcmp(defs, "N/A") == 0 )
@@ -970,11 +1006,6 @@ void ResetPlugin()
 	char sMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(sMap, sizeof(sMap));
 
-	if( strcmp(sMap, g_sLastMap) == 0 )
-		return;
-
-	strcopy(g_sLastMap, sizeof(g_sLastMap), sMap);
-
 	if( g_bLoadNewMap )
 	{
 		g_bLoadNewMap = false;
@@ -997,11 +1028,13 @@ void ResetPlugin()
 	{
 		ArrayList aHand;
 		int size = g_alWeaponsData.Length;
+
 		for( int i = 0; i < size; i++ )
 		{
 			aHand = g_alWeaponsData.Get(i);
 			delete aHand;
 		}
+
 		g_alWeaponsData.Clear();
 		delete g_alWeaponsData;
 	}
@@ -1052,21 +1085,82 @@ void LoadConfig()
 {
 	g_alMissionData = new ArrayList(ByteCountToCells(MAX_STRING_LENGTH));
 	g_alWeaponsData = new ArrayList();
+	int pos;
 
-	char sPath[PLATFORM_MAX_PATH];
 
+
+	// ==========
+	// Mission config
+	// ==========
 	g_iSectionMission = 1;
-	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_MISSION);
-	if( FileExists(sPath) )
-		ParseConfigFile(sPath);
+	BuildPath(Path_SM, g_sConfigMission, sizeof(g_sConfigMission), CONFIG_MISSION);
+	pos = StrContains(g_sConfigMission, ".cfg");
 
+	if( pos != -1 )
+	{
+		g_sConfigMission[pos] = 0;
+		Format(g_sConfigMission, sizeof(g_sConfigMission), "%s.%s.cfg", g_sConfigMission, g_sGameMode);
+	}
+
+	// Check for gamemode config
+	if( FileExists(g_sConfigMission) )
+	{
+		ParseConfigFile(g_sConfigMission);
+	}
+	else
+	{
+		// Load normal config
+		BuildPath(Path_SM, g_sConfigMission, sizeof(g_sConfigMission), CONFIG_MISSION);
+		if( FileExists(g_sConfigMission) )
+		{
+			g_bGameMode = false;
+			ParseConfigFile(g_sConfigMission);
+
+			g_bGameMode = true;
+			ParseConfigFile(g_sConfigMission);
+
+			g_bGameMode = false;
+		}
+	}
+
+
+
+	// ==========
+	// Weapons config
+	// ==========
 	g_iSectionMission = 0;
-	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_WEAPONS);
-	if( FileExists(sPath) )
-		ParseConfigFile(sPath);
+
+	BuildPath(Path_SM, g_sConfigWeapons, sizeof(g_sConfigWeapons), CONFIG_WEAPONS);
+	pos = StrContains(g_sConfigWeapons, ".cfg");
+	if( pos != -1 )
+	{
+		g_sConfigWeapons[pos] = 0;
+		Format(g_sConfigWeapons, sizeof(g_sConfigWeapons), "%s.%s.cfg", g_sConfigWeapons, g_sGameMode);
+	}
+
+	// Check for gamemode config
+	if( FileExists(g_sConfigWeapons) )
+	{
+		ParseConfigFile(g_sConfigWeapons);
+	}
+	else
+	{
+		// Load normal config
+		BuildPath(Path_SM, g_sConfigWeapons, sizeof(g_sConfigWeapons), CONFIG_WEAPONS);
+		if( FileExists(g_sConfigWeapons) )
+		{
+			g_bGameMode = false;
+			ParseConfigFile(g_sConfigWeapons);
+
+			g_bGameMode = true;
+			ParseConfigFile(g_sConfigWeapons);
+
+			g_bGameMode = false;
+		}
+	}
 }
 
-bool ParseConfigFile(const char[] file)
+void ParseConfigFile(const char[] file)
 {
 	// Load parser and set hook functions
 	SMCParser parser = new SMCParser();
@@ -1091,7 +1185,7 @@ bool ParseConfigFile(const char[] file)
 	}
 
 	delete parser;
-	return (result == SMCError_Okay);
+	// return (result == SMCError_Okay);
 }
 
 SMCResult Config_NewSection(Handle parser, const char[] section, bool quotes)
@@ -1106,32 +1200,42 @@ SMCResult Config_NewSection(Handle parser, const char[] section, bool quotes)
 		{
 			g_bAllowSection = true;
 		} else {
-			char sMap[PLATFORM_MAX_PATH];
-			GetCurrentMap(sMap, sizeof(sMap));
-
-			if( StrContains(section, ",") != -1 )
+			if( g_bGameMode )
 			{
-				int index, last;
-				int len = strlen(section) + 2;
-				char[] newSection = new char [len];
-				StrCat(newSection, len, section);
-				StrCat(newSection, len, ",");
-
-				while( (index = StrContains(newSection[last], ",")) != -1 )
+				if( strcmp(section, g_sGameMode) == 0 )
 				{
-					newSection[last + index] = 0;
-					if( StrContains(sMap, newSection[last], false) != -1 )
-					{
-						g_bAllowSection = true;
-						break;
-					}
-					newSection[last + index] = ',';
-					last += index + 1;
+					g_bAllowSection = true;
 				}
 			}
-			else if( StrContains(sMap, section, false) != -1 )
+			else
 			{
-				g_bAllowSection = true;
+				char sMap[PLATFORM_MAX_PATH];
+				GetCurrentMap(sMap, sizeof(sMap));
+
+				if( StrContains(section, ",") != -1 )
+				{
+					int index, last;
+					int len = strlen(section) + 2;
+					char[] newSection = new char [len];
+					StrCat(newSection, len, section);
+					StrCat(newSection, len, ",");
+
+					while( (index = StrContains(newSection[last], ",")) != -1 )
+					{
+						newSection[last + index] = 0;
+						if( StrContains(sMap, newSection[last], false) != -1 )
+						{
+							g_bAllowSection = true;
+							break;
+						}
+						newSection[last + index] = ',';
+						last += index + 1;
+					}
+				}
+				else if( StrContains(sMap, section, false) != -1 )
+				{
+					g_bAllowSection = true;
+				}
 			}
 		}
 	}
