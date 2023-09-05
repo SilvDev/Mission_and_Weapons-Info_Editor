@@ -1,6 +1,6 @@
 /*
 *	Mission and Weapons - Info Editor
-*	Copyright (C) 2022 Silvers
+*	Copyright (C) 2023 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.19"
+#define PLUGIN_VERSION		"1.20"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.20 (05-Sep-2023)
+	- Update for L4D2 to precache melee weapon models to prevent crashes. Thanks to "S.A.S" for reporting.
 
 1.19 (16-Dec-2022)
 	- Fixed not loading melee weapons on certain maps under certain conditions. Thanks to "Mi.Cura" for reporting.
@@ -435,6 +438,49 @@ Action CmdListenBlock(int client, const char[] command, int argc)
 public void OnMapEnd()
 {
 	g_bLoadNewMap = true;
+
+	if( g_bLeft4Dead2 )
+	{
+		// Taken from MeleeInTheSaferoom
+		PrecacheModel("models/weapons/melee/v_bat.mdl", true);
+		PrecacheModel("models/weapons/melee/v_cricket_bat.mdl", true);
+		PrecacheModel("models/weapons/melee/v_crowbar.mdl", true);
+		PrecacheModel("models/weapons/melee/v_electric_guitar.mdl", true);
+		PrecacheModel("models/weapons/melee/v_fireaxe.mdl", true);
+		PrecacheModel("models/weapons/melee/v_frying_pan.mdl", true);
+		PrecacheModel("models/weapons/melee/v_golfclub.mdl", true);
+		PrecacheModel("models/weapons/melee/v_katana.mdl", true);
+		PrecacheModel("models/weapons/melee/v_machete.mdl", true);
+		PrecacheModel("models/weapons/melee/v_tonfa.mdl", true);
+		PrecacheModel("models/weapons/melee/v_pitchfork.mdl", true);
+		PrecacheModel("models/weapons/melee/v_shovel.mdl", true);
+
+		PrecacheModel("models/weapons/melee/w_bat.mdl", true);
+		PrecacheModel("models/weapons/melee/w_cricket_bat.mdl", true);
+		PrecacheModel("models/weapons/melee/w_crowbar.mdl", true);
+		PrecacheModel("models/weapons/melee/w_electric_guitar.mdl", true);
+		PrecacheModel("models/weapons/melee/w_fireaxe.mdl", true);
+		PrecacheModel("models/weapons/melee/w_frying_pan.mdl", true);
+		PrecacheModel("models/weapons/melee/w_golfclub.mdl", true);
+		PrecacheModel("models/weapons/melee/w_katana.mdl", true);
+		PrecacheModel("models/weapons/melee/w_machete.mdl", true);
+		PrecacheModel("models/weapons/melee/w_tonfa.mdl", true);
+		PrecacheModel("models/weapons/melee/w_pitchfork.mdl", true);
+		PrecacheModel("models/weapons/melee/w_shovel.mdl", true);
+
+		PrecacheGeneric("scripts/melee/baseball_bat.txt", true);
+		PrecacheGeneric("scripts/melee/cricket_bat.txt", true);
+		PrecacheGeneric("scripts/melee/crowbar.txt", true);
+		PrecacheGeneric("scripts/melee/electric_guitar.txt", true);
+		PrecacheGeneric("scripts/melee/fireaxe.txt", true);
+		PrecacheGeneric("scripts/melee/frying_pan.txt", true);
+		PrecacheGeneric("scripts/melee/golfclub.txt", true);
+		PrecacheGeneric("scripts/melee/katana.txt", true);
+		PrecacheGeneric("scripts/melee/machete.txt", true);
+		PrecacheGeneric("scripts/melee/tonfa.txt", true);
+		PrecacheGeneric("scripts/melee/pitchfork.txt", true);
+		PrecacheGeneric("scripts/melee/shovel.txt", true);
+	}
 }
 
 void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newValue)
@@ -445,7 +491,7 @@ void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newV
 
 
 // ====================================================================================================
-//					COMMANDS
+//					COMMANDS - sm_info_melee
 // ====================================================================================================
 Action CmdInfoMelee(int client, int args)
 {
@@ -463,6 +509,7 @@ Action CmdInfoMelee(int client, int args)
 
 	int total = GetStringTableNumStrings(table);
 	int max = GetStringTableMaxStrings(table);
+
 	for( int i = 0; i < total; i++ )
 	{
 		ReadStringTable(table, i, sTemp, sizeof(sTemp));
@@ -500,7 +547,7 @@ Action CmdInfoMelee(int client, int args)
 
 				mission++;
 				aMiss.PushString(sTemp[last]);
-				ReplyToCommand(client, "MissionData %2d. %s", mission, sTemp[last]);
+				ReplyToCommand(client, "MissionData %2d: [%s]", mission, sTemp[last]);
 
 				last = pos + 1;
 			}
@@ -546,6 +593,11 @@ Action CmdInfoMelee(int client, int args)
 	return Plugin_Handled;
 }
 
+
+
+// ====================================================================================================
+//					COMMANDS - sm_info_reload
+// ====================================================================================================
 Action CmdInfoReload(int client, int args)
 {
 	ReloadData();
@@ -568,6 +620,11 @@ void ReloadData()
 		SetMissionData();
 }
 
+
+
+// ====================================================================================================
+//					COMMANDS - sm_info_mission
+// ====================================================================================================
 Action CmdInfoMission(int client, int args)
 {
 	if( g_PointerMission == 0 )
@@ -622,6 +679,11 @@ Action CmdInfoMission(int client, int args)
 	return Plugin_Handled;
 }
 
+
+
+// ====================================================================================================
+//					COMMANDS - sm_info_mission_list
+// ====================================================================================================
 Action CmdInfoMissionList(int client, int args)
 {
 	ReplyToCommand(client, "=============================");
@@ -647,6 +709,11 @@ Action CmdInfoMissionList(int client, int args)
 	return Plugin_Handled;
 }
 
+
+
+// ====================================================================================================
+//					COMMANDS - sm_info_weapons_list
+// ====================================================================================================
 Action CmdInfoWeaponsList(int client, int args)
 {
 	ReplyToCommand(client, "=============================");
@@ -690,7 +757,7 @@ Action CmdInfoWeaponsList(int client, int args)
 
 
 // ====================================================================================================
-//					DETOURS
+//					DETOUR - Mission
 // ====================================================================================================
 MRESReturn GetMissionInfo(DHookReturn hReturn, DHookParam hParams)
 {
@@ -887,6 +954,11 @@ void SetMissionData()
 	}
 }
 
+
+
+// ====================================================================================================
+//					DETOURS - Melee patches
+// ====================================================================================================
 MRESReturn MeleeWeaponAllowedToExist(DHookReturn hReturn, DHookParam hParams)
 {
 	hReturn.Value = true;
@@ -912,6 +984,11 @@ MRESReturn GetMeleeWeaponInfo(DHookReturn hReturn, DHookParam hParams)
 	return MRES_Ignored;
 }
 
+
+
+// ====================================================================================================
+//					DETOUR - Weapons
+// ====================================================================================================
 MRESReturn GetWeaponInfo(DHookReturn hReturn, DHookParam hParams)
 {
 	WeaponInfoFunction(0, hParams);
@@ -994,6 +1071,41 @@ void WeaponInfoFunction(int funk, Handle hParams)
 
 
 // ====================================================================================================
+//					LOAD MELEE MANIFEST
+// ====================================================================================================
+void LoadManifest()
+{
+	if( g_bLeft4Dead2 )
+	{
+		delete g_alMeleeCustoms;
+		g_alMeleeCustoms = new ArrayList(ByteCountToCells(MAX_STRING_MELEE));
+
+		File hFile = OpenFile("scripts/melee/melee_manifest.txt", "r", true);
+		if( hFile )
+		{
+			char sLine[256];
+			int start;
+			int last;
+
+			while( !IsEndOfFile(hFile) && ReadFileLine(hFile, sLine, sizeof(sLine)) )
+			{
+				start = StrContains(sLine, "scripts/melee/", false);
+				if( start != -1 )
+				{
+					last = StrContains(sLine[start + 14], ".txt", false);
+					sLine[start + 14 + last] = 0;
+					g_alMeleeCustoms.PushString(sLine[start + 14]);
+				}
+			}
+
+			delete hFile;
+		}
+	}
+}
+
+
+
+// ====================================================================================================
 //					LOAD CONFIG
 // ====================================================================================================
 bool g_bAllowSection;
@@ -1003,9 +1115,6 @@ int g_iValueIndex;
 
 void ResetPlugin()
 {
-	char sMap[PLATFORM_MAX_PATH];
-	GetCurrentMap(sMap, sizeof(sMap));
-
 	if( g_bLoadNewMap )
 	{
 		g_bLoadNewMap = false;
@@ -1049,36 +1158,6 @@ void OnStart()
 {
 	// Reparse weapon and melee configs each map
 	ServerCommand("weapon_reparse_server; %s", g_bLeft4Dead2 ? "melee_reload_info_server" : "");
-}
-
-void LoadManifest()
-{
-	if( g_bLeft4Dead2 )
-	{
-		delete g_alMeleeCustoms;
-		g_alMeleeCustoms = new ArrayList(ByteCountToCells(MAX_STRING_MELEE));
-
-		File hFile = OpenFile("scripts/melee/melee_manifest.txt", "r", true);
-		if( hFile )
-		{
-			char sLine[256];
-			int start;
-			int last;
-
-			while( !IsEndOfFile(hFile) && ReadFileLine(hFile, sLine, sizeof(sLine)) )
-			{
-				start = StrContains(sLine, "scripts/melee/", false);
-				if( start != -1 )
-				{
-					last = StrContains(sLine[start + 14], ".txt", false);
-					sLine[start + 14 + last] = 0;
-					g_alMeleeCustoms.PushString(sLine[start + 14]);
-				}
-			}
-
-			delete hFile;
-		}
-	}
 }
 
 void LoadConfig()
