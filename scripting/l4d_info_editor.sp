@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.20"
+#define PLUGIN_VERSION		"1.21"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.21 (09-Sep-2023)
+	- Update for L4D2 to precache melee weapon models to prevent crashes. Wrongly was OnMapEnd instead of OnMapStart.
 
 1.20 (05-Sep-2023)
 	- Update for L4D2 to precache melee weapon models to prevent crashes. Thanks to "S.A.S" for reporting.
@@ -435,10 +438,8 @@ Action CmdListenBlock(int client, const char[] command, int argc)
 	return Plugin_Continue;
 }
 
-public void OnMapEnd()
+public void OnMapStart()
 {
-	g_bLoadNewMap = true;
-
 	if( g_bLeft4Dead2 )
 	{
 		// Taken from MeleeInTheSaferoom
@@ -481,6 +482,11 @@ public void OnMapEnd()
 		PrecacheGeneric("scripts/melee/pitchfork.txt", true);
 		PrecacheGeneric("scripts/melee/shovel.txt", true);
 	}
+}
+
+public void OnMapEnd()
+{
+	g_bLoadNewMap = true;
 }
 
 void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newValue)
