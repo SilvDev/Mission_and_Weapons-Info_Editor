@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.21"
+#define PLUGIN_VERSION		"1.22"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,17 @@
 
 ========================================================================================
 	Change Log:
+
+1.22 (10-Sep-2023)
+	- Fixed not loading the map specific sections. Thanks to "KadabraZz" for reporting.
+	- The config data load order slightly changed:
+	- 1. Attempt to load "all" section.
+	- 2. Attempt to load custom maps section.
+	- 3. Attempt to load game mode specific configs.
+	- 4. Attempt to load game mode specific sections within a config.
+	- 5. Game mode specific sections can be overwritten by map specific sections when the map specific section is below the game mode specific section.
+
+	- The default config files have been cleaned up, and example config files provided instead.
 
 1.21 (09-Sep-2023)
 	- Update for L4D2 to precache melee weapon models to prevent crashes. Wrongly was OnMapEnd instead of OnMapStart.
@@ -1235,10 +1246,10 @@ void LoadConfig()
 		if( FileExists(g_sConfigWeapons) )
 		{
 			g_bGameMode = false;
-			ParseConfigFile(g_sConfigWeapons);
+			ParseConfigFile(g_sConfigMission);
 
 			g_bGameMode = true;
-			ParseConfigFile(g_sConfigWeapons);
+			ParseConfigFile(g_sConfigMission);
 
 			g_bGameMode = false;
 		}
@@ -1281,16 +1292,13 @@ SMCResult Config_NewSection(Handle parser, const char[] section, bool quotes)
 	{
 		g_bAllowSection = false;
 
-		if( strcmp(section, "all") == 0 )
+		if( !g_bGameMode && strcmp(section, "all") == 0 )
 		{
 			g_bAllowSection = true;
 		} else {
-			if( g_bGameMode )
+			if( g_bGameMode && strcmp(section, g_sGameMode) == 0 )
 			{
-				if( strcmp(section, g_sGameMode) == 0 )
-				{
-					g_bAllowSection = true;
-				}
+				g_bAllowSection = true;
 			}
 			else
 			{
