@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.22"
+#define PLUGIN_VERSION		"1.23"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.23 (10-Sep-2023)
+	- Fixed mistake with the last update not reading the weapons config. Thanks to "ProjectSky" for reporting.
 
 1.22 (10-Sep-2023)
 	- Fixed not loading the map specific sections. Thanks to "KadabraZz" for reporting.
@@ -1246,10 +1249,10 @@ void LoadConfig()
 		if( FileExists(g_sConfigWeapons) )
 		{
 			g_bGameMode = false;
-			ParseConfigFile(g_sConfigMission);
+			ParseConfigFile(g_sConfigWeapons);
 
 			g_bGameMode = true;
-			ParseConfigFile(g_sConfigMission);
+			ParseConfigFile(g_sConfigWeapons);
 
 			g_bGameMode = false;
 		}
