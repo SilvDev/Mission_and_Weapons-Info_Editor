@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.23"
+#define PLUGIN_VERSION		"1.24"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,11 @@
 
 ========================================================================================
 	Change Log:
+
+1.24 (19-Sep-2023)
+	- Update for L4D2:
+	- Fixed not precaching the Knife model. Thanks to "S.A.S" for reporting.
+	- Fixed not loading melee weapons on some 3rd party maps that are missing the "meleeweapons" key value. Thanks to "Iizuka07" for reporting.
 
 1.23 (10-Sep-2023)
 	- Fixed mistake with the last update not reading the weapons config. Thanks to "ProjectSky" for reporting.
@@ -162,10 +167,10 @@
 #define GAMEDATA				"l4d_info_editor"
 #define CONFIG_MISSION			"data/l4d_info_editor_mission.cfg"
 #define CONFIG_WEAPONS			"data/l4d_info_editor_weapons.cfg"
+#define CONFIG_MANIFEST			"scripts/melee/melee_manifest.txt"
 #define MAX_STRING_LENGTH		4096
 #define MAX_STRING_MELEE		64 // Maximum string length of melee weapons
-#define DEBUG_VALUES			0
-#define FORCE_VALUES			1 // Force create keyvalues when not found.
+#define DEBUG_VALUES			false
 
 bool g_bGameMode;
 ConVar g_hCvarMPGameMode;
@@ -183,7 +188,7 @@ ArrayList g_alMeleeDefault;
 ArrayList g_alMeleeCustoms;
 int g_PointerMission;
 bool g_bLeft4Dead2;
-bool g_bLoadNewMap;
+bool g_bLoadNewMap = true;
 bool g_bManifest;
 bool g_bHasMelee;
 
@@ -275,10 +280,12 @@ int Native_SetString(Handle plugin, int numParams)
 
 	// Create
 	bool bCreate = GetNativeCell(4);
-	if( bCreate && SDK_KV_FindKey != null )
+
+	if( bCreate )
 	{
 		char sCheck[MAX_STRING_LENGTH];
 		SDKCall(SDK_KV_GetString, pThis, sCheck, sizeof(sCheck), key, "N/A");
+
 		if( strcmp(sCheck, "N/A") == 0 )
 		{
 			SDKCall(SDK_KV_FindKey, pThis, key, true);
@@ -333,7 +340,6 @@ public void OnPluginStart()
 	if( SDK_KV_SetString == null )
 		SetFailState("Could not prep the \"KeyValues::SetString\" function.");
 
-	// Optional, not required.
 	StartPrepSDKCall(SDKCall_Raw);
 	if( PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "KeyValues::FindKey") == false )
 	{
@@ -345,6 +351,8 @@ public void OnPluginStart()
 		if( SDK_KV_FindKey == null )
 			LogError("Could not prep the \"KeyValues::FindKey\" function.");
 	}
+
+
 
 	// ====================================================================================================
 	// Detours
@@ -465,6 +473,7 @@ public void OnMapStart()
 		PrecacheModel("models/weapons/melee/v_frying_pan.mdl", true);
 		PrecacheModel("models/weapons/melee/v_golfclub.mdl", true);
 		PrecacheModel("models/weapons/melee/v_katana.mdl", true);
+		PrecacheModel("models/weapons/melee/v_knife_t.mdl", true);
 		PrecacheModel("models/weapons/melee/v_machete.mdl", true);
 		PrecacheModel("models/weapons/melee/v_tonfa.mdl", true);
 		PrecacheModel("models/weapons/melee/v_pitchfork.mdl", true);
@@ -478,6 +487,7 @@ public void OnMapStart()
 		PrecacheModel("models/weapons/melee/w_frying_pan.mdl", true);
 		PrecacheModel("models/weapons/melee/w_golfclub.mdl", true);
 		PrecacheModel("models/weapons/melee/w_katana.mdl", true);
+		PrecacheModel("models/weapons/melee/w_knife_t.mdl", true);
 		PrecacheModel("models/weapons/melee/w_machete.mdl", true);
 		PrecacheModel("models/weapons/melee/w_tonfa.mdl", true);
 		PrecacheModel("models/weapons/melee/w_pitchfork.mdl", true);
@@ -491,6 +501,7 @@ public void OnMapStart()
 		PrecacheGeneric("scripts/melee/frying_pan.txt", true);
 		PrecacheGeneric("scripts/melee/golfclub.txt", true);
 		PrecacheGeneric("scripts/melee/katana.txt", true);
+		PrecacheGeneric("scripts/melee/knife.txt", true);
 		PrecacheGeneric("scripts/melee/machete.txt", true);
 		PrecacheGeneric("scripts/melee/tonfa.txt", true);
 		PrecacheGeneric("scripts/melee/pitchfork.txt", true);
@@ -676,9 +687,11 @@ Action CmdInfoMission(int client, int args)
 
 		// Create if not found.
 		bool existed = true;
-		if( SDK_KV_FindKey != null && strcmp(check, "N/A") == 0 )
+
+		if( strcmp(check, "N/A") == 0 )
 		{
 			SDKCall(SDK_KV_FindKey, g_PointerMission, key, true);
+
 			existed = false;
 		}
 
@@ -937,37 +950,27 @@ void SetMissionData()
 					if( value[pos - 1] == ';' ) value[pos - 1] = 0;
 				}
 			}
-			else
-			{
-				strcopy(value, sizeof(value), defs);
-			}
 		}
 
 		// Overwrite different values
 		if( write || strcmp(defs, value) )
 		{
-			#if DEBUG_VALUES || FORCE_VALUES
 			if( strcmp(defs, "N/A") == 0 )
 			{
-				#if FORCE_VALUES
-					if( SDK_KV_FindKey != null )
-					{
-						SDKCall(SDK_KV_FindKey, g_PointerMission, key, true);
-						#if DEBUG_VALUES
-							PrintToServer("MissionInfo: Attempted to create \"%s\"", key);
-						#endif
-					}
-				#endif
+				SDKCall(SDK_KV_FindKey, g_PointerMission, key, true);
 
 				#if DEBUG_VALUES
-					PrintToServer("MissionInfo: \"%s\" not found.", key);
+				PrintToServer(">>> MissionInfo: Attempted to create \"%s\"", key);
+				SDKCall(SDK_KV_SetString, g_PointerMission, key, "");
+
+				SDKCall(SDK_KV_GetString, g_PointerMission, check, sizeof(check), key, "N/A");
+				PrintToServer(">>> MissionInfo: \"%s\" contains: \"%s\"", key, check);
 				#endif
+			#if DEBUG_VALUES
 			} else {
-				#if DEBUG_VALUES
-					PrintToServer("MissionInfo: Set \"%s\" to \"%s\". Was \"%s\"", key, value, defs);
-				#endif
-			}
+				PrintToServer(">>> MissionInfo: Set \"%s\" to \"%s\". Was \"%s\"", key, value, defs);
 			#endif
+			}
 
 			SDKCall(SDK_KV_SetString, g_PointerMission, key, value);
 		}
@@ -987,6 +990,12 @@ MRESReturn MeleeWeaponAllowedToExist(DHookReturn hReturn, DHookParam hParams)
 
 MRESReturn LoadScriptsFromManifest(DHookReturn hReturn, DHookParam hParams)
 {
+	if( g_bLoadNewMap )
+	{
+		ResetPlugin();
+		SetMissionData();
+	}
+
 	g_bManifest = true;
 
 	if( g_bHasMelee )
@@ -1052,28 +1061,24 @@ void WeaponInfoFunction(int funk, Handle hParams)
 
 				if( strcmp(check, value) )
 				{
-					#if DEBUG_VALUES || FORCE_VALUES
 					if( strcmp(check, "N/A") == 0 )
 					{
-						#if FORCE_VALUES
-							if( SDK_KV_FindKey != null )
-							{
-								SDKCall(SDK_KV_FindKey, pThis, key, true);
-								#if DEBUG_VALUES
-									PrintToServer("WeaponInfo: Attempted to create \"%s\"", key);
-								#endif
-							}
+						SDKCall(SDK_KV_FindKey, pThis, key, true);
+				
+						#if DEBUG_VALUES
+							PrintToServer(">>> WeaponInfo: Attempted to create \"%s\"", key);
+							SDKCall(SDK_KV_SetString, g_PointerMission, key, "");
+
+							SDKCall(SDK_KV_GetString, pThis, check, sizeof(check), key, "N/A");
+							PrintToServer(">>> WeaponInfo: \"%s\" contains: \"%s\"", key, check);
 						#endif
 
-						#if DEBUG_VALUES
-							PrintToServer("WeaponInfo: \"%s/%s\" not found.", class, key);
-						#endif
+
+					#if DEBUG_VALUES
 					} else {
-						#if DEBUG_VALUES
-							PrintToServer("WeaponInfo: Set \"%s/%s\" to \"%s\". Was \"%s\"", class, key, value, check);
-						#endif
-					}
+							PrintToServer(">>> WeaponInfo: Set \"%s/%s\" to \"%s\". Was \"%s\"", class, key, value, check);
 					#endif
+					}
 
 					SDKCall(SDK_KV_SetString, pThis, key, value);
 				}
@@ -1100,7 +1105,7 @@ void LoadManifest()
 		delete g_alMeleeCustoms;
 		g_alMeleeCustoms = new ArrayList(ByteCountToCells(MAX_STRING_MELEE));
 
-		File hFile = OpenFile("scripts/melee/melee_manifest.txt", "r", true);
+		File hFile = OpenFile(CONFIG_MANIFEST, "r", true);
 		if( hFile )
 		{
 			char sLine[256];
