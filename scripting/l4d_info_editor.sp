@@ -1,6 +1,6 @@
 /*
 *	Mission and Weapons - Info Editor
-*	Copyright (C) 2023 Silvers
+*	Copyright (C) 2024 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.25"
+#define PLUGIN_VERSION		"1.26"
 
 /*======================================================================================
 	Plugin Info:
@@ -32,8 +32,11 @@
 ========================================================================================
 	Change Log:
 
+1.26 (15-May-2024)
+	- Updated L4D2 GameData for the 2.2.3.8 game update.
+
 1.25 (25-Oct-2023)
-	- Test plugins will now throw an error if running, to notify server owners they should only be using for testing and as an example.
+	- Test plugins will now throw an error if running, to notify server owners they should only be used for testing and as an example.
 
 1.24 (19-Sep-2023)
 	- Update for L4D2:
@@ -249,11 +252,11 @@ int Native_GetString(Handle plugin, int numParams)
 	if( len <= 0 ) return 0;
 
 	// Key name to get
-	char key[MAX_STRING_LENGTH];
+	static char key[MAX_STRING_LENGTH];
 	GetNativeString(2, key, sizeof(key));
 
 	// Get key value
-	char value[MAX_STRING_LENGTH];
+	static char value[MAX_STRING_LENGTH];
 	SDKCall(SDK_KV_GetString, pThis, value, sizeof(value), key, "N/A");
 
 	// Return string
@@ -277,7 +280,7 @@ int Native_SetString(Handle plugin, int numParams)
 	GetNativeStringLength(3, len);
 
 	// Key name and value to set
-	char key[MAX_STRING_LENGTH];
+	static char key[MAX_STRING_LENGTH];
 	char[] value = new char[len+1];
 	GetNativeString(2, key, sizeof(key));
 	GetNativeString(3, value, len+1);
@@ -287,7 +290,7 @@ int Native_SetString(Handle plugin, int numParams)
 
 	if( bCreate )
 	{
-		char sCheck[MAX_STRING_LENGTH];
+		static char sCheck[MAX_STRING_LENGTH];
 		SDKCall(SDK_KV_GetString, pThis, sCheck, sizeof(sCheck), key, "N/A");
 
 		if( strcmp(sCheck, "N/A") == 0 )
@@ -1157,7 +1160,6 @@ void ResetPlugin()
 	// Clear strings
 	if( g_alMissionData != null )
 	{
-		g_alMissionData.Clear();
 		delete g_alMissionData;
 	}
 
@@ -1173,7 +1175,6 @@ void ResetPlugin()
 			delete aHand;
 		}
 
-		g_alWeaponsData.Clear();
 		delete g_alWeaponsData;
 	}
 
