@@ -454,7 +454,7 @@ public void OnPluginStart()
 		g_alMeleeDefault.PushString("tonfa");
 		g_alMeleeDefault.PushString("pitchfork");
 		g_alMeleeDefault.PushString("shovel");
-		g_alMeleeDefault.PushString("riot_shield");
+		g_alMeleeDefault.PushString("riotshield");
 	}
 }
 
@@ -915,7 +915,7 @@ void SetMissionData()
 				ReplaceStringEx(check, sizeof(check), ";tonfa;", ";");
 				ReplaceStringEx(check, sizeof(check), ";pitchfork;", ";");
 				ReplaceStringEx(check, sizeof(check), ";shovel;", ";");
-				ReplaceStringEx(check, sizeof(check), ";riot_shield;", ";");
+				ReplaceStringEx(check, sizeof(check), ";riotshield;", ";");
 
 				// Prevent duplicate entries
 				pos = 1;
