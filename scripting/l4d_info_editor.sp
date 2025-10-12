@@ -931,22 +931,50 @@ void SetMissionData()
 				
 				if( extra[0] )
 				{
-					Format(value, sizeof(value), "%s;%s", extra[1], value);
+					Format(value, sizeof(value), "%s;%s", value, extra[1]);
 				}
 
 				// Prevent setting over melee weapons limit
-				pos = 0;
-				for( int x = 0; x < MAX_MELEE_LIMITS; x++ )
+				// We need to start from the end to the start
+				// (to prevent an intended melee weapon from disappearing)
+
+				// Although it may truncate melee weapons at the beginning
+				// it should fix the desync caused by the absolute negligence of map makers
+
+				// Disclaimer: Snippet shamelessly fixed by AI, works but may need an improvement
+				// to make the code more readable
+				int count = 1; // Start at 1 since last weapon won't have trailing ;
+				for( int x = 0; x < strlen(value); x++ )
 				{
-					last = FindCharInString(value[pos], ';');
-					if( last == -1 ) break;
+					if( value[x] == ';' ) count++;
+				}
 
-					pos += last + 1;
-
-					if( x == 15 )
+				// If we have too many weapons, remove from the beginning
+				if( count > MAX_MELEE_LIMITS )
+				{
+					int toSkip = count - MAX_MELEE_LIMITS;
+					int skipped = 0;
+					pos = 0;
+					
+					// Find position after the weapons we want to skip
+					while( skipped < toSkip && pos < strlen(value) )
 					{
-						value[pos] = 0;
-						break;
+						if( value[pos] == ';' )
+						{
+							skipped++;
+							if( skipped == toSkip )
+							{
+								pos++; // Move past the semicolon
+								break;
+							}
+						}
+						pos++;
+					}
+					
+					// Shift the string to remove the beginning
+					if( pos > 0 )
+					{
+						strcopy(value, sizeof(value), value[pos]);
 					}
 				}
 
