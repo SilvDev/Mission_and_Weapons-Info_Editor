@@ -170,14 +170,15 @@
 #include <sourcemod>
 #include <dhooks>
 
-#define GAMEDATA				"l4d_info_editor"
-#define CONFIG_MISSION			"data/l4d_info_editor_mission.cfg"
-#define CONFIG_WEAPONS			"data/l4d_info_editor_weapons.cfg"
-#define CONFIG_MANIFEST			"scripts/melee/melee_manifest.txt"
-#define MAX_STRING_LENGTH		4096
-#define MAX_MELEE_STRING		64 // Maximum string length of melee weapons
-#define MAX_MELEE_LIMITS		16 // Maximum number of melee weapons that can be enabled (Valve limit)
-#define DEBUG_VALUES			false
+#define GAMEDATA						"l4d_info_editor"
+#define CONFIG_MISSION					"data/l4d_info_editor_mission.cfg"
+#define CONFIG_WEAPONS					"data/l4d_info_editor_weapons.cfg"
+#define CONFIG_MANIFEST					"scripts/melee/melee_manifest.txt"
+#define MAP_SPECIFIC_FIXES_DIRECTORY	"data/l42_info_editor_map_specific_fixes"
+#define MAX_STRING_LENGTH				4096
+#define MAX_MELEE_STRING				64 // Maximum string length of melee weapons
+#define MAX_MELEE_LIMITS				16 // Maximum number of melee weapons that can be enabled (Valve limit)
+#define DEBUG_VALUES					false
 
 bool g_bGameMode;
 ConVar g_hCvarMPGameMode;
@@ -514,6 +515,8 @@ public void OnMapStart()
 		PrecacheGeneric("scripts/melee/pitchfork.txt", true);
 		PrecacheGeneric("scripts/melee/shovel.txt", true);
 	}
+
+	ResetPlugin();
 }
 
 public void OnMapEnd()
@@ -821,6 +824,12 @@ MRESReturn GetMissionInfo(DHookReturn hReturn, DHookParam hParams)
 
 void SetMissionData()
 {
+	static char mapname[MAX_NAME_LENGTH];
+	GetCurrentMap(mapname, sizeof(mapname));
+	static char mapfix_file[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, mapfix_file, sizeof(mapfix_file), "%s/%s.txt", MAP_SPECIFIC_FIXES_DIRECTORY, mapname);
+	bool bHasMapFix = FileExists(mapfix_file);
+
 	// Mission Info has no command, but we can manually set changes with ease.
 	static char key[MAX_STRING_LENGTH];
 	static char value[MAX_STRING_LENGTH];
@@ -921,6 +930,20 @@ void SetMissionData()
 				pos = 1;
 				while( (last = SplitString(check[pos], ";", temp, sizeof(temp))) != -1 )
 				{
+					if(bHasMapFix)
+					{
+						if(CheckIfMapperWasNegligent(mapfix_file, temp))
+						{
+							#if DEBUG_VALUES
+							PrintToServer(">>> MissionInfo: Skipped melee weapon: %s (map fix)", extra[1]);
+							#endif
+
+							extra[0] = 0;
+							pos += last;
+							continue;
+						}
+					}
+
 					if( StrContains(value, temp) == -1 && StrContains(extra, temp) == -1 )
 					{
 						Format(extra, sizeof(extra), "%s;%s", extra, temp);
@@ -933,6 +956,7 @@ void SetMissionData()
 				{
 					Format(value, sizeof(value), "%s;%s", value, extra[1]);
 				}
+
 
 				// Prevent setting over melee weapons limit
 				// We need to start from the end to the start
@@ -1467,3 +1491,36 @@ void Config_End(Handle parser, bool halted, bool failed)
 	if( failed )
 		SetFailState("Error: Cannot load the Info Editor config.");
 }
+
+/**
+ * Check if the mapper was negligent and added a weapon that doesn't exist into the map definition file.
+ * 
+ * @param mapfix_file The path to the map-specific fixes file.
+ * @param weapon The weapon to check for.
+ * 
+ * @return True if the weapon is found in the mapfix file, false otherwise.
+ * 
+ * @todo Move mapfix_file to a global? 
+ */
+bool CheckIfMapperWasNegligent(const char[] mapfix_file, const char[] weapon)
+{
+	File hFile = OpenFile(mapfix_file, "r", true);
+	if( hFile )
+	{
+		char sLine[256];
+
+		while(!IsEndOfFile(hFile) && ReadFileLine(hFile, sLine, sizeof(sLine)))
+		{
+			TrimString(sLine);
+			if(StrEqual(sLine, weapon, false))
+			{
+				delete hFile;
+				return true;
+			}
+		}
+
+		delete hFile;
+	}
+
+	return false;
+}	
