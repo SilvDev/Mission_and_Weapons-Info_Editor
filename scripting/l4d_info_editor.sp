@@ -1,6 +1,6 @@
 /*
 *	Mission and Weapons - Info Editor
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2026 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.26"
+#define PLUGIN_VERSION		"1.27"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,10 @@
 
 ========================================================================================
 	Change Log:
+
+1.27 (04-Jan-2026)
+	- L4D2: Fixed the "riotshield" classname being wrongly named, causing errors in certain maps. Thanks to "gabuch2" for reporting.
+	- L4D2: Fixed adding melee weapons with missing scripts, causing errors in certain maps. Thanks to "gabuch2" for reporting.
 
 1.26 (15-May-2024)
 	- Updated L4D2 GameData for the 2.2.3.8 game update.
@@ -454,7 +458,7 @@ public void OnPluginStart()
 		g_alMeleeDefault.PushString("tonfa");
 		g_alMeleeDefault.PushString("pitchfork");
 		g_alMeleeDefault.PushString("shovel");
-		g_alMeleeDefault.PushString("riot_shield");
+		g_alMeleeDefault.PushString("riotshield");
 	}
 }
 
@@ -828,6 +832,7 @@ void SetMissionData()
 	static char check[MAX_STRING_LENGTH];
 	static char defs[MAX_STRING_LENGTH];
 	static char temp[MAX_MELEE_STRING];
+	static char path[PLATFORM_MAX_PATH];
 
 	// Loop through Info Editor config
 	bool write;
@@ -848,6 +853,12 @@ void SetMissionData()
 		{
 			g_bHasMelee = true;
 			write = false;
+
+			// Ignore unknown melee weapons that have no valid script (default mission data)
+			ValidateMelee(defs);
+
+			// Ignore unknown melee weapons that have no valid script (custom mission data)
+			ValidateMelee(value);
 
 			// Add manifest entries for custom melee weapons when the mission file does not supply the "meleeweapons" string
 			// Ignore these default melee weapons
@@ -879,7 +890,7 @@ void SetMissionData()
 				if( check[0] )
 				{
 					// If the maps "meleeweapons" string is empty, set them from the manifest
-					if( strcmp(defs, "N/A") == 0  )
+					if( strcmp(defs, "N/A") == 0 )
 					{
 						write = true;
 						strcopy(defs, sizeof(defs), check);
@@ -889,7 +900,7 @@ void SetMissionData()
 				else if( g_bManifest )
 				{
 					// If the maps "meleeweapons" string is empty, set them from the data config
-					if( strcmp(defs, "N/A") == 0  )
+					if( strcmp(defs, "N/A") == 0 )
 					{
 						write = true;
 						strcopy(defs, sizeof(defs), value);
@@ -915,7 +926,7 @@ void SetMissionData()
 				ReplaceStringEx(check, sizeof(check), ";tonfa;", ";");
 				ReplaceStringEx(check, sizeof(check), ";pitchfork;", ";");
 				ReplaceStringEx(check, sizeof(check), ";shovel;", ";");
-				ReplaceStringEx(check, sizeof(check), ";riot_shield;", ";");
+				ReplaceStringEx(check, sizeof(check), ";riotshield;", ";");
 
 				// Prevent duplicate entries
 				pos = 1;
@@ -923,12 +934,17 @@ void SetMissionData()
 				{
 					if( StrContains(value, temp) == -1 && StrContains(extra, temp) == -1 )
 					{
-						Format(extra, sizeof(extra), "%s;%s", extra, temp);
+						// Ignore unknown melee weapons that have no valid script
+						FormatEx(path, sizeof(path), "scripts/melee/%s", temp);
+						if( FileExists(path, true) )
+						{
+							Format(extra, sizeof(extra), "%s;%s", extra, temp);
+						}
 					}
 
 					pos += last;
 				}
-				
+
 				if( extra[0] )
 				{
 					Format(value, sizeof(value), "%s;%s", extra[1], value);
@@ -943,7 +959,7 @@ void SetMissionData()
 
 					pos += last + 1;
 
-					if( x == 15 )
+					if( x == MAX_MELEE_LIMITS - 1 )
 					{
 						value[pos] = 0;
 						break;
@@ -981,6 +997,38 @@ void SetMissionData()
 
 			SDKCall(SDK_KV_SetString, g_PointerMission, key, value);
 		}
+	}
+}
+
+void ValidateMelee(char input[MAX_STRING_LENGTH])
+{
+	static char buffer[MAX_MELEE_STRING];
+	static char output[MAX_STRING_LENGTH];
+	static char path[PLATFORM_MAX_PATH];
+	int pos;
+	int last;
+
+	output[0] = 0;
+
+	if( input[0] )
+	{
+		while( (last = SplitString(input[pos], ";", buffer, sizeof(buffer))) != -1 )
+		{
+			// Ignore unknown melee weapons that have no valid script
+			FormatEx(path, sizeof(path), "scripts/melee/%s.txt", buffer);
+
+			if( FileExists(path, true) )
+			{
+				Format(output, sizeof(output), "%s;%s", output, buffer);
+			}
+
+			pos += last;
+		}
+	}
+
+	if( output[0] )
+	{
+		strcopy(input, sizeof(input), output[1]);
 	}
 }
 
@@ -1071,7 +1119,7 @@ void WeaponInfoFunction(int funk, Handle hParams)
 					if( strcmp(check, "N/A") == 0 )
 					{
 						SDKCall(SDK_KV_FindKey, pThis, key, true);
-				
+
 						#if DEBUG_VALUES
 							PrintToServer(">>> WeaponInfo: Attempted to create \"%s\"", key);
 							SDKCall(SDK_KV_SetString, g_PointerMission, key, "");
