@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.29"
+#define PLUGIN_VERSION		"1.30"
 
 /*======================================================================================
 	Plugin Info:
@@ -32,11 +32,14 @@
 ========================================================================================
 	Change Log:
 
+1.30 (04-Jun-2026)
+	- L4D2: Fixed 3rd party melee weapons breaking in a recent updated. Thanks to "f1993062317" for reporting.
+
 1.29 (17-Feb-2026)
 	- Plugin now attempts to load "l4d_info_editor_mission.mode.difficulty.cfg" and "l4d_info_editor_weapons.mode.difficulty.cfg".
 	- They will be loaded if the config file exists instead of loading the default or "mode" config.
 	- For example running "coop" on "normal" difficulty will load "l4d_info_editor_mission.coop.normal.cfg" if available.
-	- Valid difficulties are "easy", "normal", "hard" and "expert.
+	- Valid difficulties are "easy", "normal", "hard" and "expert".
 	. Requested by "Mika Misori".
 
 	- Plugin now creates a "l4d_info_editor.cfg" cvar config in the servers "cfgs/sourcemod" folder.
@@ -347,8 +350,8 @@ public void OnPluginStart()
 {
 	CreateConVar("l4d_info_editor_version", PLUGIN_VERSION, "Mission and Weapons - Info Editor plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
-	g_hCvarSuffixMission = CreateConVar("l4d_info_editor_suffix_mission", "", "Optional config suffix to load: l4d_info_editor_weapons.<suffix>.cfg and l4d_info_editor_mission.<suffix>.cfg", CVAR_FLAGS);
-	g_hCvarSuffixWeapons = CreateConVar("l4d_info_editor_suffix_weapons", "", "Optional config suffix to load: l4d_info_editor_weapons.<suffix>.cfg and l4d_info_editor_mission.<suffix>.cfg", CVAR_FLAGS);
+	g_hCvarSuffixMission = CreateConVar("l4d_info_editor_suffix_mission", "", "Optional config suffix to load: l4d_info_editor_mission.<suffix>.cfg", CVAR_FLAGS);
+	g_hCvarSuffixWeapons = CreateConVar("l4d_info_editor_suffix_weapons", "", "Optional config suffix to load: l4d_info_editor_weapons.<suffix>.cfg", CVAR_FLAGS);
 	AutoExecConfig(true, "l4d_info_editor");
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
@@ -488,7 +491,7 @@ public void OnPluginStart()
 
 	if( g_bLeft4Dead2 )
 	{
-		RegAdminCmd("sm_info_melee",	CmdInfoMelee,		ADMFLAG_ROOT, "Lists the maps current melee weapons allowed and report any issues.");
+		RegAdminCmd("sm_info_melee",	CmdInfoMelee,		ADMFLAG_ROOT, "Lists the maps current melee weapons allowed and reports any issues.");
 
 		// Add stock melee weapons, used to remove from manifest
 		g_alMeleeDefault = new ArrayList(ByteCountToCells(MAX_MELEE_STRING));
@@ -998,7 +1001,7 @@ void SetMissionData()
 					if( StrContains(value, temp) == -1 && StrContains(extra, temp) == -1 )
 					{
 						// Ignore unknown melee weapons that have no valid script
-						FormatEx(path, sizeof(path), "scripts/melee/%s", temp);
+						FormatEx(path, sizeof(path), "scripts/melee/%s.txt", temp);
 						if( FileExists(path, true) )
 						{
 							Format(extra, sizeof(extra), "%s;%s", extra, temp);
